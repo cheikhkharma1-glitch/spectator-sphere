@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   QrCode, Calendar, Bell, MapPin, ChevronRight, Clock,
-  Trophy, Users, ArrowLeft, Zap, Volume2, LogOut
+  Trophy, Users, ArrowLeft, Zap, Volume2, LogOut, Shield
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/useRole";
 import { toast } from "sonner";
 
 type EventRow = {
@@ -50,6 +51,7 @@ const tabs = [
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("schedule");
   const { user, signOut } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const [events, setEvents] = useState<EventRow[]>([]);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -137,6 +139,13 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link to="/admin">
+                <Button variant="ghost" size="icon" className="h-8 w-8" title="Admin">
+                  <Shield className="h-4 w-4 text-primary" />
+                </Button>
+              </Link>
+            )}
             <div className="relative">
               <Bell className="h-5 w-5 text-muted-foreground" />
               {notifications.some((n) => !n.read) && (
