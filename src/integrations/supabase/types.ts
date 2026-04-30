@@ -14,7 +14,149 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      events: {
+        Row: {
+          created_at: string
+          id: string
+          score: string | null
+          sport: string
+          starts_at: string
+          status: Database["public"]["Enums"]["event_status"]
+          teams: string
+          updated_at: string
+          venue: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          score?: string | null
+          sport: string
+          starts_at: string
+          status?: Database["public"]["Enums"]["event_status"]
+          teams: string
+          updated_at?: string
+          venue: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          score?: string | null
+          sport?: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["event_status"]
+          teams?: string
+          updated_at?: string
+          venue?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          read: boolean
+          title: string
+          urgent: boolean
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          read?: boolean
+          title: string
+          urgent?: boolean
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          read?: boolean
+          title?: string
+          urgent?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tickets: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          qr_code: string
+          reference: string
+          row_number: string | null
+          seat: string | null
+          status: Database["public"]["Enums"]["ticket_status"]
+          tribune: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          qr_code?: string
+          reference?: string
+          row_number?: string | null
+          seat?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          tribune?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          qr_code?: string
+          reference?: string
+          row_number?: string | null
+          seat?: string | null
+          status?: Database["public"]["Enums"]["ticket_status"]
+          tribune?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +165,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      event_status: "upcoming" | "live" | "finished"
+      ticket_status: "valid" | "used" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +293,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      event_status: ["upcoming", "live", "finished"],
+      ticket_status: ["valid", "used", "cancelled"],
+    },
   },
 } as const
