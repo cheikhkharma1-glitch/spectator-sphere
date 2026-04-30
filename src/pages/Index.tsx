@@ -3,6 +3,7 @@ import { QrCode, Calendar, Bell, MapPin, CreditCard, Star } from "lucide-react";
 import heroStadium from "@/assets/hero-stadium.jpg";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 
 const features = [
   {
@@ -38,6 +39,8 @@ const features = [
 ];
 
 const Index = () => {
+  const { user } = useAuth();
+  const target = user ? "/dashboard" : "/auth";
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -53,9 +56,9 @@ const Index = () => {
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fonctionnalités</a>
             <a href="#how" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Comment ça marche</a>
           </div>
-          <Link to="/dashboard">
+          <Link to={target}>
             <Button size="sm" className="glow-primary">
-              Accéder à l'app
+              {user ? "Mon espace" : "Se connecter"}
             </Button>
           </Link>
         </div>
@@ -85,7 +88,7 @@ const Index = () => {
               De l'achat de votre billet à la dernière minute de jeu, Fan 360 digitalise toute votre expérience spectateur.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/dashboard">
+              <Link to={target}>
                 <Button size="lg" className="glow-primary text-base px-8">
                   Commencer maintenant
                 </Button>
@@ -207,7 +210,7 @@ const Index = () => {
             <p className="text-muted-foreground mb-8 max-w-lg mx-auto">
               Rejoignez des milliers de supporters qui vivent déjà l'expérience Fan 360.
             </p>
-            <Link to="/dashboard">
+            <Link to={target}>
               <Button size="lg" className="glow-primary text-base px-10">
                 Accéder à mon espace
               </Button>

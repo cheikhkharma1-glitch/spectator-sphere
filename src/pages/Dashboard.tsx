@@ -1,26 +1,44 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   QrCode, Calendar, Bell, MapPin, ChevronRight, Clock,
-  Trophy, Users, ArrowLeft, Zap, Volume2
+  Trophy, Users, ArrowLeft, Zap, Volume2, LogOut
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
-// Mock data
-const events = [
-  { id: 1, sport: "Football", teams: "Sénégal vs Cameroun", time: "18:00", venue: "Stade Abdoulaye Wade", status: "live", score: "2 - 1" },
-  { id: 2, sport: "Basketball", teams: "Sénégal vs Mali", time: "20:30", venue: "Dakar Arena", status: "upcoming" },
-  { id: 3, sport: "Athlétisme", teams: "100m Finale", time: "21:00", venue: "Stade LSS", status: "upcoming" },
-  { id: 4, sport: "Natation", teams: "200m Libre", time: "14:00", venue: "Piscine Olympique", status: "finished", score: "Terminé" },
-];
+type EventRow = {
+  id: string;
+  sport: string;
+  teams: string;
+  venue: string;
+  starts_at: string;
+  status: "upcoming" | "live" | "finished";
+  score: string | null;
+};
 
-const notifications = [
-  { id: 1, title: "⚽ BUT ! Sénégal 2 - 1", time: "il y a 3 min", urgent: true },
-  { id: 2, title: "🏀 Match Basketball dans 1h", time: "il y a 15 min", urgent: false },
-  { id: 3, title: "📍 Buvette B2 — file d'attente courte", time: "il y a 20 min", urgent: false },
-  { id: 4, title: "🎫 Votre billet a été vérifié", time: "il y a 1h", urgent: false },
-];
+type TicketRow = {
+  id: string;
+  reference: string;
+  tribune: string | null;
+  row_number: string | null;
+  seat: string | null;
+  qr_code: string;
+  status: string;
+  event: { teams: string; starts_at: string } | null;
+};
+
+type NotificationRow = {
+  id: string;
+  title: string;
+  body: string | null;
+  urgent: boolean;
+  read: boolean;
+  created_at: string;
+};
 
 const tabs = [
   { id: "schedule", label: "Programme", icon: Calendar },
@@ -31,6 +49,74 @@ const tabs = [
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("schedule");
+  const { user, signOut } = useAuth();
+  const [events, setEvents] = useState<EventRow[]>([]);
+  const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [notifications, setNotifications] = useState<NotificationRow[]>([]);
+  const [firstName, setFirstName] = useState<string>("");
+
+  useEffect(() => {
+    if (!user) return;
+
+    supabase.from("profiles").select("first_name").eq("id", user.id).maybeSingle()
+      .then(({ data }) => setFirstName(data?.first_name ?? ""));
+
+    supabase.from("events").select("*").order("starts_at").then(({ data }) => {
+      if (data) setEvents(data as EventRow[]);
+    });
+
+    supabase.from("tickets")
+      .select("id, reference, tribune, row_number, seat, qr_code, status, event:events(teams, starts_at)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setTickets(data as unknown as TicketRow[]); });
+
+    supabase.from("notifications").select("*").eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setNotifications(data as NotificationRow[]); });
+
+    const eventsCh = supabase
+      .channel("events-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "events" }, (payload) => {
+        setEvents((prev) => {
+          if (payload.eventType === "INSERT") return [...prev, payload.new as EventRow];
+          if (payload.eventType === "UPDATE") return prev.map((e) => e.id === (payload.new as EventRow).id ? payload.new as EventRow : e);
+          if (payload.eventType === "DELETE") return prev.filter((e) => e.id !== (payload.old as EventRow).id);
+          return prev;
+        });
+      })
+      .subscribe();
+
+    const notifCh = supabase
+      .channel("notif-changes")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
+        setNotifications((prev) => [payload.new as NotificationRow, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(eventsCh);
+      supabase.removeChannel(notifCh);
+    };
+  }, [user]);
+
+  const liveEvent = events.find((e) => e.status === "live");
+  const primaryTicket = tickets[0];
+
+  const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const formatRelative = (iso: string) => {
+    const diff = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (diff < 1) return "à l'instant";
+    if (diff < 60) return `il y a ${diff} min`;
+    const h = Math.round(diff / 60);
+    if (h < 24) return `il y a ${h}h`;
+    return new Date(iso).toLocaleDateString("fr-FR");
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Déconnecté");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -45,45 +131,56 @@ const Dashboard = () => {
             </Link>
             <div>
               <h1 className="font-display text-lg font-bold">Fan 360</h1>
-              <p className="text-xs text-muted-foreground">Bienvenue, Amadou 👋</p>
+              <p className="text-xs text-muted-foreground">
+                Bienvenue{firstName ? `, ${firstName}` : ""} 👋
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
               <Bell className="h-5 w-5 text-muted-foreground" />
-              <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+              {notifications.some((n) => !n.read) && (
+                <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-primary border-2 border-background" />
+              )}
             </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut} title="Se déconnecter">
+              <LogOut className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Live banner */}
-      <div className="container mx-auto px-6 mt-6">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-xl p-4 border-primary/30 glow-primary"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium">
-              <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
-              EN DIRECT
-            </span>
-            <span className="text-xs text-muted-foreground">Stade Abdoulaye Wade</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="font-display text-xl font-bold">Sénégal vs Cameroun</div>
-              <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                <Clock className="h-3.5 w-3.5" /> 72' • Football
+      {liveEvent && (
+        <div className="container mx-auto px-6 mt-6">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card rounded-xl p-4 border-primary/30 glow-primary"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+                EN DIRECT
+              </span>
+              <span className="text-xs text-muted-foreground">{liveEvent.venue}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-display text-xl font-bold">{liveEvent.teams}</div>
+                <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5" /> {liveEvent.sport}
+                </div>
               </div>
+              {liveEvent.score && (
+                <div className="text-right">
+                  <div className="font-display text-3xl font-bold text-gradient">{liveEvent.score}</div>
+                </div>
+              )}
             </div>
-            <div className="text-right">
-              <div className="font-display text-3xl font-bold text-gradient">2 - 1</div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Tab content */}
       <div className="container mx-auto px-6 mt-6 pb-24">
@@ -91,6 +188,9 @@ const Dashboard = () => {
           {activeTab === "schedule" && (
             <motion.div key="schedule" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <h2 className="font-display text-xl font-bold mb-4">Programme du jour</h2>
+              {events.length === 0 && (
+                <p className="text-sm text-muted-foreground">Aucun événement pour le moment.</p>
+              )}
               <div className="space-y-3">
                 {events.map((event) => (
                   <div key={event.id} className="glass-card rounded-xl p-4 flex items-center gap-4">
@@ -107,11 +207,11 @@ const Dashboard = () => {
                     </div>
                     <div className="text-right shrink-0">
                       {event.status === "live" ? (
-                        <span className="text-sm font-bold text-gradient">{event.score}</span>
+                        <span className="text-sm font-bold text-gradient">{event.score ?? "Live"}</span>
                       ) : event.status === "finished" ? (
-                        <span className="text-xs text-muted-foreground">{event.score}</span>
+                        <span className="text-xs text-muted-foreground">{event.score ?? "Terminé"}</span>
                       ) : (
-                        <span className="text-sm font-semibold text-foreground">{event.time}</span>
+                        <span className="text-sm font-semibold text-foreground">{formatTime(event.starts_at)}</span>
                       )}
                       {event.status === "live" && (
                         <div className="flex items-center gap-1 text-xs text-destructive mt-0.5">
@@ -128,23 +228,34 @@ const Dashboard = () => {
           {activeTab === "ticket" && (
             <motion.div key="ticket" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <h2 className="font-display text-xl font-bold mb-4">Mon billet</h2>
-              <div className="glass-card rounded-2xl p-6 text-center glow-primary max-w-sm mx-auto">
-                <div className="mb-4">
-                  <span className="text-xs text-muted-foreground">BILLET #FAN-2026-4892</span>
+              {!primaryTicket ? (
+                <div className="glass-card rounded-2xl p-8 text-center max-w-sm mx-auto">
+                  <QrCode className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">Vous n'avez pas encore de billet.</p>
                 </div>
-                <div className="bg-foreground/5 rounded-xl p-8 mb-6">
-                  <QrCode className="h-32 w-32 mx-auto text-primary" strokeWidth={1} />
+              ) : (
+                <div className="glass-card rounded-2xl p-6 text-center glow-primary max-w-sm mx-auto">
+                  <div className="mb-4">
+                    <span className="text-xs text-muted-foreground">BILLET #{primaryTicket.reference}</span>
+                  </div>
+                  <div className="bg-foreground/5 rounded-xl p-8 mb-6">
+                    <QrCode className="h-32 w-32 mx-auto text-primary" strokeWidth={1} />
+                  </div>
+                  <div className="font-display text-lg font-bold">{primaryTicket.event?.teams ?? "Événement"}</div>
+                  <div className="text-sm text-muted-foreground mt-1">
+                    {[primaryTicket.tribune, primaryTicket.row_number && `Rang ${primaryTicket.row_number}`, primaryTicket.seat && `Siège ${primaryTicket.seat}`].filter(Boolean).join(" — ")}
+                  </div>
+                  {primaryTicket.event && (
+                    <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {new Date(primaryTicket.event.starts_at).toLocaleDateString("fr-FR")}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {formatTime(primaryTicket.event.starts_at)}</span>
+                    </div>
+                  )}
+                  <div className="mt-4 px-3 py-1.5 rounded-full bg-success/10 text-success text-xs font-medium inline-block">
+                    ✓ Billet {primaryTicket.status === "valid" ? "vérifié" : primaryTicket.status}
+                  </div>
                 </div>
-                <div className="font-display text-lg font-bold">Amadou Diallo</div>
-                <div className="text-sm text-muted-foreground mt-1">Tribune Est — Rang 12, Siège 45</div>
-                <div className="mt-4 flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> 15 Mars 2026</span>
-                  <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> 18:00</span>
-                </div>
-                <div className="mt-4 px-3 py-1.5 rounded-full bg-success/10 text-success text-xs font-medium inline-block">
-                  ✓ Billet vérifié
-                </div>
-              </div>
+              )}
             </motion.div>
           )}
 
@@ -176,6 +287,9 @@ const Dashboard = () => {
           {activeTab === "notifications" && (
             <motion.div key="notifs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <h2 className="font-display text-xl font-bold mb-4">Notifications</h2>
+              {notifications.length === 0 && (
+                <p className="text-sm text-muted-foreground">Aucune notification pour le moment.</p>
+              )}
               <div className="space-y-3">
                 {notifications.map((notif) => (
                   <div
@@ -185,7 +299,7 @@ const Dashboard = () => {
                     <div className={`h-2 w-2 rounded-full shrink-0 ${notif.urgent ? "bg-primary" : "bg-muted-foreground/30"}`} />
                     <div className="flex-1">
                       <div className="text-sm font-medium">{notif.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{notif.time}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{formatRelative(notif.created_at)}</div>
                     </div>
                   </div>
                 ))}
