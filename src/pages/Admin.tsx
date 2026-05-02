@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Plus, Pencil, Trash2, Send, Calendar, Bell, Shield } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Send, Calendar, Bell, Shield, AlertTriangle, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,48 +131,55 @@ const Admin = () => {
   };
 
   const sendBroadcast = async () => {
-    const title = notifTitle.trim();
-    const body = notifBody.trim();
-    if (!title) {
-      toast.error("Le titre est requis");
-      return;
-    }
-    if (title.length > 120 || body.length > 500) {
-      toast.error("Texte trop long");
-      return;
-    }
     setSending(true);
-    // Fetch all profiles (one notif per user)
-    const { data: profiles, error: pErr } = await supabase
-      .from("profiles")
-      .select("id");
-    if (pErr || !profiles) {
-      setSending(false);
-      toast.error("Impossible de récupérer les destinataires");
-      return;
-    }
-    const rows = profiles.map((p) => ({
-      user_id: p.id,
-      title,
-      body: body || null,
-      urgent: notifUrgent,
-    }));
-    if (rows.length === 0) {
-      setSending(false);
-      toast.error("Aucun destinataire");
-      return;
-    }
-    const { error } = await supabase.from("notifications").insert(rows);
+    const { data, error } = await supabase.functions.invoke("broadcast-notification", {
+      body: {
+        title: notifTitle,
+        body: notifBody,
+        urgent: notifUrgent,
+      },
+    });
     setSending(false);
     if (error) {
-      toast.error("Erreur : " + error.message);
+      // Try to surface server validation errors
+      const ctx = (error as { context?: Response }).context;
+      if (ctx) {
+        try {
+          const payload = await ctx.json();
+          if (payload?.errors) {
+            const first = Object.values(payload.errors)[0] as string;
+            toast.error(first);
+            return;
+          }
+          if (payload?.error) {
+            toast.error(payload.error);
+            return;
+          }
+        } catch {/* ignore */}
+      }
+      toast.error("Erreur d'envoi : " + error.message);
       return;
     }
-    toast.success(`Notification envoyée à ${rows.length} spectateur(s)`);
+    const recipients = (data as { recipients?: number } | null)?.recipients ?? 0;
+    toast.success(`Notification envoyée à ${recipients} spectateur(s)`);
     setNotifTitle("");
     setNotifBody("");
     setNotifUrgent(false);
   };
+
+  // Live client-side validation (mirrors server rules for instant feedback)
+  const previewTitle = notifTitle.trim();
+  const previewBody = notifBody.trim();
+  const validationError = useMemo(() => {
+    if (!previewTitle) return null; // empty = nothing to preview yet
+    if (previewTitle.length < 3) return "Titre trop court (min. 3 caractères)";
+    if (previewTitle.length > 120) return "Titre trop long (max. 120)";
+    if (previewBody.length > 500) return "Message trop long (max. 500)";
+    if (/<script|javascript:|onerror=|onload=/i.test(previewTitle + " " + previewBody))
+      return "Contenu non autorisé";
+    return null;
+  }, [previewTitle, previewBody]);
+  const canSend = !!previewTitle && !validationError && !sending;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -297,6 +304,7 @@ const Admin = () => {
                   placeholder="Changement de programme"
                   maxLength={120}
                 />
+                <p className="text-xs text-muted-foreground text-right">{notifTitle.length}/120</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="nbody">Message</Label>
@@ -308,6 +316,7 @@ const Admin = () => {
                   maxLength={500}
                   placeholder="Détails de l'alerte…"
                 />
+                <p className="text-xs text-muted-foreground text-right">{notifBody.length}/500</p>
               </div>
               <div className="flex items-center justify-between">
                 <div>
@@ -316,10 +325,65 @@ const Admin = () => {
                 </div>
                 <Switch id="urgent" checked={notifUrgent} onCheckedChange={setNotifUrgent} />
               </div>
-              <Button onClick={sendBroadcast} disabled={sending} className="w-full gap-2">
+              {validationError && (
+                <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{validationError}</span>
+                </div>
+              )}
+              <Button onClick={sendBroadcast} disabled={!canSend} className="w-full gap-2">
                 <Send className="h-4 w-4" />
                 {sending ? "Envoi…" : "Envoyer à tous"}
               </Button>
+            </div>
+
+            {/* Live preview */}
+            <div className="mt-6">
+              <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+                <Eye className="h-4 w-4" />
+                <span>Prévisualisation côté spectateur</span>
+              </div>
+              {previewTitle ? (
+                <div
+                  className={`rounded-xl border p-4 transition ${
+                    notifUrgent
+                      ? "border-accent/60 bg-accent/10"
+                      : "border-border bg-card"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div
+                      className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 ${
+                        notifUrgent ? "bg-accent text-accent-foreground" : "bg-primary/15 text-primary"
+                      }`}
+                    >
+                      {notifUrgent ? <AlertTriangle className="h-4 w-4" /> : <Bell className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <p className="font-semibold truncate">{previewTitle}</p>
+                        {notifUrgent && (
+                          <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent text-accent-foreground font-bold">
+                            Urgent
+                          </span>
+                        )}
+                      </div>
+                      {previewBody ? (
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                          {previewBody}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground italic">(Pas de message)</p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-2">À l'instant</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  Saisissez un titre pour voir la prévisualisation.
+                </div>
+              )}
             </div>
           </motion.section>
         )}
