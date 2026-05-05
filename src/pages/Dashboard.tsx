@@ -10,16 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useIsAdmin } from "@/hooks/useRole";
 import { toast } from "sonner";
-
-type EventRow = {
-  id: string;
-  sport: string;
-  teams: string;
-  venue: string;
-  starts_at: string;
-  status: "upcoming" | "live" | "finished";
-  score: string | null;
-};
+import { QRCodeSVG } from "qrcode.react";
+import { ScheduleTab, type EventRow } from "@/components/dashboard/ScheduleTab";
+import { BuyTicketDialog } from "@/components/dashboard/BuyTicketDialog";
+import { StadiumGuide } from "@/components/dashboard/StadiumGuide";
 
 type TicketRow = {
   id: string;
@@ -29,6 +23,7 @@ type TicketRow = {
   seat: string | null;
   qr_code: string;
   status: string;
+  event_id?: string;
   event: { teams: string; starts_at: string } | null;
 };
 
@@ -56,6 +51,16 @@ const Dashboard = () => {
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [firstName, setFirstName] = useState<string>("");
+  const [buyEvent, setBuyEvent] = useState<EventRow | null>(null);
+
+  const loadTickets = () => {
+    if (!user) return;
+    supabase.from("tickets")
+      .select("id, reference, tribune, row_number, seat, qr_code, status, event_id, event:events(teams, starts_at)")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => { if (data) setTickets(data as unknown as TicketRow[]); });
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -67,11 +72,7 @@ const Dashboard = () => {
       if (data) setEvents(data as EventRow[]);
     });
 
-    supabase.from("tickets")
-      .select("id, reference, tribune, row_number, seat, qr_code, status, event:events(teams, starts_at)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => { if (data) setTickets(data as unknown as TicketRow[]); });
+    loadTickets();
 
     supabase.from("notifications").select("*").eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -104,6 +105,7 @@ const Dashboard = () => {
 
   const liveEvent = events.find((e) => e.status === "live");
   const primaryTicket = tickets[0];
+  const ownedEventIds = new Set(tickets.map((t) => t.event_id).filter(Boolean) as string[]);
 
   const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const formatRelative = (iso: string) => {
@@ -195,43 +197,12 @@ const Dashboard = () => {
       <div className="container mx-auto px-6 mt-6 pb-24">
         <AnimatePresence mode="wait">
           {activeTab === "schedule" && (
-            <motion.div key="schedule" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="font-display text-xl font-bold mb-4">Programme du jour</h2>
-              {events.length === 0 && (
-                <p className="text-sm text-muted-foreground">Aucun événement pour le moment.</p>
-              )}
-              <div className="space-y-3">
-                {events.map((event) => (
-                  <div key={event.id} className="glass-card rounded-xl p-4 flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Trophy className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-display font-semibold text-sm">{event.teams}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                        <span>{event.sport}</span>
-                        <span>•</span>
-                        <span>{event.venue}</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      {event.status === "live" ? (
-                        <span className="text-sm font-bold text-gradient">{event.score ?? "Live"}</span>
-                      ) : event.status === "finished" ? (
-                        <span className="text-xs text-muted-foreground">{event.score ?? "Terminé"}</span>
-                      ) : (
-                        <span className="text-sm font-semibold text-foreground">{formatTime(event.starts_at)}</span>
-                      )}
-                      {event.status === "live" && (
-                        <div className="flex items-center gap-1 text-xs text-destructive mt-0.5">
-                          <Volume2 className="h-3 w-3" /> Live
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+            <ScheduleTab
+              key="schedule"
+              events={events}
+              onBuy={(e) => setBuyEvent(e)}
+              hasTicketFor={(id) => ownedEventIds.has(id)}
+            />
           )}
 
           {activeTab === "ticket" && (
@@ -247,8 +218,8 @@ const Dashboard = () => {
                   <div className="mb-4">
                     <span className="text-xs text-muted-foreground">BILLET #{primaryTicket.reference}</span>
                   </div>
-                  <div className="bg-foreground/5 rounded-xl p-8 mb-6">
-                    <QrCode className="h-32 w-32 mx-auto text-primary" strokeWidth={1} />
+                  <div className="bg-white rounded-xl p-6 mb-6 inline-block">
+                    <QRCodeSVG value={primaryTicket.qr_code} size={160} level="H" />
                   </div>
                   <div className="font-display text-lg font-bold">{primaryTicket.event?.teams ?? "Événement"}</div>
                   <div className="text-sm text-muted-foreground mt-1">
@@ -268,30 +239,7 @@ const Dashboard = () => {
             </motion.div>
           )}
 
-          {activeTab === "map" && (
-            <motion.div key="map" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="font-display text-xl font-bold mb-4">Guide du site</h2>
-              <div className="space-y-3">
-                {[
-                  { name: "Entrée principale", dist: "Vous y êtes", icon: MapPin, color: "text-success" },
-                  { name: "Buvette B2", dist: "120m — File courte", icon: Zap, color: "text-warning" },
-                  { name: "Boutique officielle", dist: "200m", icon: Users, color: "text-info" },
-                  { name: "Tribune Est", dist: "80m — Votre place", icon: ChevronRight, color: "text-primary" },
-                ].map((place) => (
-                  <div key={place.name} className="glass-card rounded-xl p-4 flex items-center gap-4 cursor-pointer hover:border-primary/30 transition-colors">
-                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <place.icon className={`h-5 w-5 ${place.color}`} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-display font-semibold text-sm">{place.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{place.dist}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
+          {activeTab === "map" && <StadiumGuide key="map" />}
 
           {activeTab === "notifications" && (
             <motion.div key="notifs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -317,6 +265,12 @@ const Dashboard = () => {
           )}
         </AnimatePresence>
       </div>
+
+      <BuyTicketDialog
+        event={buyEvent}
+        onClose={() => setBuyEvent(null)}
+        onPurchased={loadTickets}
+      />
 
       {/* Bottom tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 glass-card border-t border-border">
