@@ -239,7 +239,6 @@ const Dashboard = () => {
             </motion.div>
           )}
 
-          {activeTab === "map" && (
           {activeTab === "map" && <StadiumGuide key="map" />}
 
           {activeTab === "notifications" && (
