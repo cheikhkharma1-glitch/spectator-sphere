@@ -93,7 +93,13 @@ const Dashboard = () => {
     const notifCh = supabase
       .channel("notif-changes")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${user.id}` }, (payload) => {
-        setNotifications((prev) => [payload.new as NotificationRow, ...prev]);
+        const n = payload.new as NotificationRow;
+        setNotifications((prev) => [n, ...prev]);
+        if (n.urgent) {
+          toast.error(n.title, { description: n.body ?? undefined, duration: 6000 });
+        } else {
+          toast.message(n.title, { description: n.body ?? undefined, duration: 5000 });
+        }
       })
       .subscribe();
 
