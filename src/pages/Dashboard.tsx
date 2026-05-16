@@ -14,6 +14,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { ScheduleTab, type EventRow } from "@/components/dashboard/ScheduleTab";
 import { BuyTicketDialog } from "@/components/dashboard/BuyTicketDialog";
 import { StadiumGuide } from "@/components/dashboard/StadiumGuide";
+import { LiveMatchCard } from "@/components/dashboard/LiveMatchCard";
 
 type TicketRow = {
   id: string;
@@ -109,7 +110,17 @@ const Dashboard = () => {
     };
   }, [user]);
 
-  const liveEvent = events.find((e) => e.status === "live");
+  const liveEvent =
+    events.find((e) => e.status === "live") ??
+    ({
+      id: "demo-sen",
+      sport: "Football",
+      teams: "Sénégal vs Maroc",
+      venue: "Stade Abdoulaye Wade, Diamniadio",
+      starts_at: new Date().toISOString(),
+      status: "live",
+      score: "2-1",
+    } as EventRow);
   const primaryTicket = tickets[0];
   const ownedEventIds = new Set(tickets.map((t) => t.event_id).filter(Boolean) as string[]);
 
@@ -167,35 +178,15 @@ const Dashboard = () => {
         </div>
       </header>
 
-      {/* Live banner */}
+      {/* Live match card */}
       {liveEvent && (
         <div className="container mx-auto px-6 mt-6">
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="glass-card rounded-xl p-4 border-primary/30 glow-primary"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-destructive/20 text-destructive text-xs font-medium">
-                <span className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
-                EN DIRECT
-              </span>
-              <span className="text-xs text-muted-foreground">{liveEvent.venue}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="font-display text-xl font-bold">{liveEvent.teams}</div>
-                <div className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5" /> {liveEvent.sport}
-                </div>
-              </div>
-              {liveEvent.score && (
-                <div className="text-right">
-                  <div className="font-display text-3xl font-bold text-gradient">{liveEvent.score}</div>
-                </div>
-              )}
-            </div>
-          </motion.div>
+          <LiveMatchCard
+            teams={liveEvent.teams}
+            venue={liveEvent.venue}
+            sport={liveEvent.sport}
+            score={liveEvent.score}
+          />
         </div>
       )}
 
