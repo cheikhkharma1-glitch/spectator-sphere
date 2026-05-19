@@ -15,6 +15,8 @@ import { ScheduleTab, type EventRow } from "@/components/dashboard/ScheduleTab";
 import { BuyTicketDialog } from "@/components/dashboard/BuyTicketDialog";
 import { StadiumGuide } from "@/components/dashboard/StadiumGuide";
 import { LiveMatchCard } from "@/components/dashboard/LiveMatchCard";
+import { FavoriteTeamPicker } from "@/components/dashboard/FavoriteTeamPicker";
+import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
 
 type TicketRow = {
   id: string;
@@ -48,6 +50,7 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState("schedule");
   const { user, signOut } = useAuth();
   const { isAdmin } = useIsAdmin();
+  const { team: favTeam } = useFavoriteTeam();
   const [events, setEvents] = useState<EventRow[]>([]);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -115,7 +118,7 @@ const Dashboard = () => {
     ({
       id: "demo-sen",
       sport: "Football",
-      teams: "Sénégal vs Maroc",
+      teams: `${favTeam.name} vs ${favTeam.id === "maroc" ? "Sénégal" : "Maroc"}`,
       venue: "Stade Abdoulaye Wade, Diamniadio",
       starts_at: new Date().toISOString(),
       status: "live",
@@ -158,6 +161,7 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <FavoriteTeamPicker />
             {isAdmin && (
               <Link to="/admin">
                 <Button variant="ghost" size="icon" className="h-8 w-8" title="Admin">
