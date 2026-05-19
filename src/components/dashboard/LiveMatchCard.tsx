@@ -1,4 +1,5 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { Activity, Flame, Goal, Radio, Timer, Users } from "lucide-react";
 import { SenegalFlag } from "./SenegalFlag";
 import { Progress } from "@/components/ui/progress";
@@ -15,6 +16,7 @@ type Props = {
   shotsHome?: number;
   shotsAway?: number;
   attendance?: number;
+  isLive?: boolean;
 };
 
 const ScoreDigit = ({ value }: { value: string }) => (
@@ -41,8 +43,56 @@ export const LiveMatchCard = ({
   shotsHome = 11,
   shotsAway = 6,
   attendance = 48230,
+  isLive = true,
 }: Props) => {
   const [home = "0", away = "0"] = (score ?? "0-0").split(/[-:]/).map((s) => s.trim());
+
+  // Live state: minuteur + stats qui évoluent en direct
+  const [liveMinute, setLiveMinute] = useState(minute);
+  const [livePossession, setLivePossession] = useState(possessionHome);
+  const [liveShotsHome, setLiveShotsHome] = useState(shotsHome);
+  const [liveShotsAway, setLiveShotsAway] = useState(shotsAway);
+  const [liveAttendance, setLiveAttendance] = useState(attendance);
+  const [pulseScore, setPulseScore] = useState(false);
+
+  // Sync props -> state lorsque de nouvelles données arrivent (realtime DB)
+  useEffect(() => setLiveMinute(minute), [minute]);
+  useEffect(() => setLivePossession(possessionHome), [possessionHome]);
+  useEffect(() => setLiveShotsHome(shotsHome), [shotsHome]);
+  useEffect(() => setLiveShotsAway(shotsAway), [shotsAway]);
+  useEffect(() => setLiveAttendance(attendance), [attendance]);
+
+  // Flash visuel lorsque le score change
+  useEffect(() => {
+    if (!score) return;
+    setPulseScore(true);
+    const t = setTimeout(() => setPulseScore(false), 1500);
+    return () => clearTimeout(t);
+  }, [score]);
+
+  // Minuteur du match (+1 min toutes les 60s tant que live)
+  useEffect(() => {
+    if (!isLive) return;
+    const id = setInterval(() => {
+      setLiveMinute((m) => (m < 90 ? m + 1 : m));
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [isLive]);
+
+  // Évolution dynamique des stats toutes les 8s
+  useEffect(() => {
+    if (!isLive) return;
+    const id = setInterval(() => {
+      setLivePossession((p) => {
+        const next = p + Math.round((Math.random() - 0.5) * 4);
+        return Math.max(35, Math.min(72, next));
+      });
+      if (Math.random() > 0.6) setLiveShotsHome((s) => s + 1);
+      if (Math.random() > 0.75) setLiveShotsAway((s) => s + 1);
+      setLiveAttendance((a) => a + Math.floor(Math.random() * 12));
+    }, 8000);
+    return () => clearInterval(id);
+  }, [isLive]);
 
   // Détecte le nom de l'équipe Sénégal dans la chaîne "Sénégal vs X"
   const parts = teams.split(/vs|VS|-/i).map((s) => s.trim());
@@ -82,7 +132,14 @@ export const LiveMatchCard = ({
           </motion.span>
           <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
             <Timer className="h-3 w-3" />
-            <span className="font-mono">{minute}'</span>
+            <motion.span
+              key={liveMinute}
+              initial={{ y: -6, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="font-mono"
+            >
+              {liveMinute}'
+            </motion.span>
           </span>
         </div>
         <span className="text-[11px] text-muted-foreground truncate max-w-[50%] text-right">{venue}</span>
@@ -105,14 +162,18 @@ export const LiveMatchCard = ({
         </motion.div>
 
         {/* Score central */}
-        <div className="flex flex-col items-center px-2">
+        <motion.div
+          className="flex flex-col items-center px-2 rounded-xl"
+          animate={pulseScore ? { scale: [1, 1.08, 1], filter: ["brightness(1)", "brightness(1.4)", "brightness(1)"] } : {}}
+          transition={{ duration: 0.8 }}
+        >
           <div className="flex items-center gap-2">
             <span className="text-gradient"><ScoreDigit value={home} /></span>
             <span className="font-display text-3xl text-muted-foreground/60">:</span>
             <ScoreDigit value={away} />
           </div>
           <span className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{sport}</span>
-        </div>
+        </motion.div>
 
         {/* Équipe extérieure */}
         <motion.div
@@ -138,25 +199,24 @@ export const LiveMatchCard = ({
       <div className="relative px-5">
         <div className="flex items-center justify-between text-[11px] mb-1.5">
           <span className="flex items-center gap-1 text-primary font-semibold">
-            <Activity className="h-3 w-3" /> {possessionHome}%
+            <Activity className="h-3 w-3" /> {livePossession}%
           </span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Possession</span>
-          <span className="text-muted-foreground font-semibold">{100 - possessionHome}%</span>
+          <span className="text-muted-foreground font-semibold">{100 - livePossession}%</span>
         </div>
         <div className="relative h-1.5 rounded-full overflow-hidden bg-muted">
           <motion.div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-[hsl(140,70%,40%)] via-primary to-[hsl(0,75%,50%)]"
-            initial={{ width: 0 }}
-            animate={{ width: `${possessionHome}%` }}
-            transition={{ duration: 1, ease: "easeOut" }}
+            animate={{ width: `${livePossession}%` }}
+            transition={{ duration: 1.2, ease: "easeOut" }}
           />
         </div>
       </div>
 
       {/* Stats footer */}
       <div className="relative grid grid-cols-3 gap-2 px-5 py-4 mt-4 border-t border-border/40">
-        <Stat icon={Goal} label="Tirs" value={`${shotsHome} - ${shotsAway}`} />
-        <Stat icon={Users} label="Affluence" value={attendance.toLocaleString("fr-FR")} />
+        <Stat icon={Goal} label="Tirs" value={`${liveShotsHome} - ${liveShotsAway}`} />
+        <Stat icon={Users} label="Affluence" value={liveAttendance.toLocaleString("fr-FR")} />
         <Stat icon={Flame} label="Intensité" value="Élevée" accent />
       </div>
     </motion.div>
@@ -176,7 +236,18 @@ const Stat = ({
 }) => (
   <div className="flex flex-col items-center text-center">
     <Icon className={`h-3.5 w-3.5 mb-1 ${accent ? "text-primary" : "text-muted-foreground"}`} />
-    <div className={`font-display font-bold text-sm ${accent ? "text-gradient" : ""}`}>{value}</div>
+    <AnimatePresence mode="popLayout">
+      <motion.div
+        key={value}
+        initial={{ y: 8, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: -8, opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        className={`font-display font-bold text-sm ${accent ? "text-gradient" : ""}`}
+      >
+        {value}
+      </motion.div>
+    </AnimatePresence>
     <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</div>
   </div>
 );

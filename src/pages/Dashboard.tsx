@@ -186,6 +186,7 @@ const Dashboard = () => {
             venue={liveEvent.venue}
             sport={liveEvent.sport}
             score={liveEvent.score}
+            isLive={liveEvent.status === "live"}
           />
         </div>
       )}
