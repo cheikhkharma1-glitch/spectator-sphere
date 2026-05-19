@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, Flame, Goal, Radio, Timer, Users } from "lucide-react";
-import { SenegalFlag } from "./SenegalFlag";
-import { Progress } from "@/components/ui/progress";
+import { TeamFlag } from "./TeamFlag";
+import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
+import { TEAM_LIST, getTeam } from "@/lib/teams";
 
 type Props = {
   teams: string;
@@ -45,7 +46,34 @@ export const LiveMatchCard = ({
   attendance = 48230,
   isLive = true,
 }: Props) => {
+  const { team: favTeam } = useFavoriteTeam();
+
+  // Détecte les équipes depuis la chaîne "Sénégal vs X"
+  const parts = teams.split(/vs|VS|-/i).map((s) => s.trim());
+  const rawHome = parts[0] || favTeam.name;
+  const rawAway = parts[1] || opponentName;
+
+  // Trouve l'équipe favorite dans le match (peut être à domicile OU extérieur).
+  const matchTeam = (label: string) =>
+    TEAM_LIST.find((t) => label.toLowerCase().includes(t.name.toLowerCase()));
+
+  const detectedHome = matchTeam(rawHome);
+  const detectedAway = matchTeam(rawAway);
+  const favIsAway = !detectedHome && detectedAway?.id === favTeam.id;
+
+  // L'équipe "à gauche" sur la carte = favorite si elle joue, sinon équipe domicile détectée, sinon favorite par défaut
+  const homeTeam = favIsAway ? detectedAway! : (detectedHome ?? favTeam);
+  const awayTeam = favIsAway ? (detectedHome ?? getTeam("maroc")) : (detectedAway ?? null);
+
+  const homeName = favIsAway ? rawAway : rawHome;
+  const awayName = favIsAway ? rawHome : rawAway;
+
+  // Couleur d'accent adverse : couleur de l'équipe détectée sinon prop fournie
+  const awayAccent = awayTeam ? `hsl(${awayTeam.primary})` : opponentColor;
+
   const [home = "0", away = "0"] = (score ?? "0-0").split(/[-:]/).map((s) => s.trim());
+  // Si l'équipe favorite est à l'extérieur dans le match, on inverse l'affichage du score
+  const [leftScore, rightScore] = favIsAway ? [away, home] : [home, away];
 
   // Live state: minuteur + stats qui évoluent en direct
   const [liveMinute, setLiveMinute] = useState(minute);
@@ -94,11 +122,6 @@ export const LiveMatchCard = ({
     return () => clearInterval(id);
   }, [isLive]);
 
-  // Détecte le nom de l'équipe Sénégal dans la chaîne "Sénégal vs X"
-  const parts = teams.split(/vs|VS|-/i).map((s) => s.trim());
-  const homeName = parts[0] || "Sénégal";
-  const awayName = parts[1] || opponentName;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -108,14 +131,15 @@ export const LiveMatchCard = ({
       {/* Halo lumineux animé en fond */}
       <motion.div
         aria-hidden
-        className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl"
+        className="pointer-events-none absolute -top-24 -left-24 h-64 w-64 rounded-full blur-3xl"
+        style={{ background: `hsl(${homeTeam.primary} / 0.25)` }}
         animate={{ scale: [1, 1.2, 1], opacity: [0.4, 0.7, 0.4] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden
         className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full blur-3xl"
-        style={{ backgroundColor: opponentColor, opacity: 0.18 }}
+        style={{ backgroundColor: awayAccent, opacity: 0.18 }}
         animate={{ scale: [1.1, 0.95, 1.1] }}
         transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
       />
@@ -154,10 +178,10 @@ export const LiveMatchCard = ({
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
         >
-          <SenegalFlag className="h-14 w-20" />
+          <TeamFlag team={homeTeam} className="h-14 w-20" />
           <div className="text-center">
             <div className="font-display font-bold text-sm uppercase tracking-wide">{homeName}</div>
-            <div className="text-[10px] text-muted-foreground">Lions de la Téranga</div>
+            <div className="text-[10px] text-muted-foreground">{homeTeam.nickname}</div>
           </div>
         </motion.div>
 
@@ -168,9 +192,9 @@ export const LiveMatchCard = ({
           transition={{ duration: 0.8 }}
         >
           <div className="flex items-center gap-2">
-            <span className="text-gradient"><ScoreDigit value={home} /></span>
+            <span style={{ color: `hsl(${homeTeam.primary})` }}><ScoreDigit value={leftScore} /></span>
             <span className="font-display text-3xl text-muted-foreground/60">:</span>
-            <ScoreDigit value={away} />
+            <ScoreDigit value={rightScore} />
           </div>
           <span className="mt-1 text-[10px] uppercase tracking-widest text-muted-foreground">{sport}</span>
         </motion.div>
@@ -182,15 +206,19 @@ export const LiveMatchCard = ({
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.15 }}
         >
-          <div
-            className="h-14 w-20 rounded-md shadow-lg ring-1 ring-white/10 flex items-center justify-center text-white font-display font-black text-lg"
-            style={{ backgroundColor: opponentColor }}
-          >
-            {awayName.slice(0, 3).toUpperCase()}
-          </div>
+          {awayTeam ? (
+            <TeamFlag team={awayTeam} className="h-14 w-20" />
+          ) : (
+            <div
+              className="h-14 w-20 rounded-md shadow-lg ring-1 ring-white/10 flex items-center justify-center text-white font-display font-black text-lg"
+              style={{ backgroundColor: awayAccent }}
+            >
+              {awayName.slice(0, 3).toUpperCase()}
+            </div>
+          )}
           <div className="text-center">
             <div className="font-display font-bold text-sm uppercase tracking-wide">{awayName}</div>
-            <div className="text-[10px] text-muted-foreground">Adversaire</div>
+            <div className="text-[10px] text-muted-foreground">{awayTeam?.nickname ?? "Adversaire"}</div>
           </div>
         </motion.div>
       </div>
@@ -198,7 +226,7 @@ export const LiveMatchCard = ({
       {/* Possession */}
       <div className="relative px-5">
         <div className="flex items-center justify-between text-[11px] mb-1.5">
-          <span className="flex items-center gap-1 text-primary font-semibold">
+          <span className="flex items-center gap-1 font-semibold" style={{ color: `hsl(${homeTeam.primary})` }}>
             <Activity className="h-3 w-3" /> {livePossession}%
           </span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Possession</span>
@@ -206,7 +234,10 @@ export const LiveMatchCard = ({
         </div>
         <div className="relative h-1.5 rounded-full overflow-hidden bg-muted">
           <motion.div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-[hsl(140,70%,40%)] via-primary to-[hsl(0,75%,50%)]"
+            className="absolute inset-y-0 left-0"
+            style={{
+              background: `linear-gradient(to right, hsl(${homeTeam.primary}), hsl(${homeTeam.secondary}), hsl(${homeTeam.accent}))`,
+            }}
             animate={{ width: `${livePossession}%` }}
             transition={{ duration: 1.2, ease: "easeOut" }}
           />
