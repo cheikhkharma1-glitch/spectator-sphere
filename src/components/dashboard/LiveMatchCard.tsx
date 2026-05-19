@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity, Flame, Goal, Radio, Timer, Users } from "lucide-react";
 import { TeamFlag } from "./TeamFlag";
 import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
