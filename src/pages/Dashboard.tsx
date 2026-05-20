@@ -118,8 +118,8 @@ const Dashboard = () => {
     ({
       id: "demo-sen",
       sport: "Football",
-      teams: `${favTeam.name} vs ${favTeam.id === "maroc" ? "Sénégal" : "Maroc"}`,
-      venue: "Stade Abdoulaye Wade, Diamniadio",
+      teams: `${favTeam.name} vs ${favTeam.id === "dissoo" ? "ASC Juboo" : "ASC Dissoo"}`,
+      venue: "Terrain municipal, Dakar",
       starts_at: new Date().toISOString(),
       status: "live",
       score: "2-1",
