@@ -105,3 +105,38 @@ export const DEFAULT_TEAM_ID = "senegal";
 
 export const getTeam = (id?: string | null): Team =>
   (id && TEAMS[id]) || TEAMS[DEFAULT_TEAM_ID];
+
+/** Trouve une équipe connue mentionnée dans un libellé libre. */
+export const findTeamInLabel = (label: string): Team | undefined => {
+  if (!label) return undefined;
+  const l = label.toLowerCase();
+  return TEAM_LIST.find((t) => {
+    const candidates = [t.name, t.nickname, t.shortCode].map((s) => s.toLowerCase());
+    return candidates.some((c) => c && l.includes(c));
+  });
+};
+
+export type MatchSides = {
+  homeLabel: string;
+  awayLabel: string;
+  homeTeam?: Team;
+  awayTeam?: Team;
+  /** Côté joué par l'équipe favorite, null si elle ne joue pas. */
+  favSide: "home" | "away" | null;
+};
+
+/**
+ * Parse une chaîne "X vs Y" / "X - Y" et détecte les équipes connues.
+ * NE FAIT PAS d'inversion : la position domicile/extérieur reste celle de la chaîne.
+ */
+export const parseMatchTeams = (teams: string, favoriteTeamId: string): MatchSides => {
+  const parts = teams.split(/\s+(?:vs|VS|v|-)\s+/i).map((s) => s.trim());
+  const homeLabel = parts[0] ?? "";
+  const awayLabel = parts[1] ?? "";
+  const homeTeam = findTeamInLabel(homeLabel);
+  const awayTeam = findTeamInLabel(awayLabel);
+  let favSide: "home" | "away" | null = null;
+  if (homeTeam?.id === favoriteTeamId) favSide = "home";
+  else if (awayTeam?.id === favoriteTeamId) favSide = "away";
+  return { homeLabel, awayLabel, homeTeam, awayTeam, favSide };
+};
