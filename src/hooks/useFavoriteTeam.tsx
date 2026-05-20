@@ -31,8 +31,8 @@ export const FavoriteTeamProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
-        .from("profiles")
+      const { data } = await (supabase
+        .from("profiles") as any)
         .select("favorite_team_id")
         .eq("id", user.id)
         .maybeSingle();
