@@ -1,9 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Activity, Flame, Goal, Radio, Timer, Users } from "lucide-react";
+import { Activity, Flame, Goal, Info, Radio, Timer, Users } from "lucide-react";
 import { TeamFlag } from "./TeamFlag";
 import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
-import { TEAM_LIST, getTeam } from "@/lib/teams";
+import { parseMatchTeams } from "@/lib/teams";
 
 type Props = {
   teams: string;
@@ -48,32 +48,25 @@ export const LiveMatchCard = ({
 }: Props) => {
   const { team: favTeam } = useFavoriteTeam();
 
-  // Détecte les équipes depuis la chaîne "Sénégal vs X"
-  const parts = teams.split(/vs|VS|-/i).map((s) => s.trim());
-  const rawHome = parts[0] || favTeam.name;
-  const rawAway = parts[1] || opponentName;
+  // Détection cohérente : la position (gauche/droite) suit STRICTEMENT la chaîne du match.
+  const { homeLabel, awayLabel, homeTeam: detectedHome, awayTeam: detectedAway, favSide } =
+    parseMatchTeams(teams, favTeam.id);
 
-  // Trouve l'équipe favorite dans le match (peut être à domicile OU extérieur).
-  const matchTeam = (label: string) =>
-    TEAM_LIST.find((t) => label.toLowerCase().includes(t.name.toLowerCase()));
-
-  const detectedHome = matchTeam(rawHome);
-  const detectedAway = matchTeam(rawAway);
-  const favIsAway = !detectedHome && detectedAway?.id === favTeam.id;
-
-  // L'équipe "à gauche" sur la carte = favorite si elle joue, sinon équipe domicile détectée, sinon favorite par défaut
-  const homeTeam = favIsAway ? detectedAway! : (detectedHome ?? favTeam);
-  const awayTeam = favIsAway ? (detectedHome ?? getTeam("maroc")) : (detectedAway ?? null);
-
-  const homeName = favIsAway ? rawAway : rawHome;
-  const awayName = favIsAway ? rawHome : rawAway;
-
-  // Couleur d'accent adverse : couleur de l'équipe détectée sinon prop fournie
+  const homeTeam = detectedHome ?? favTeam;
+  const awayTeam = detectedAway ?? null;
+  const homeName = homeLabel || favTeam.name;
+  const awayName = awayLabel || opponentName;
   const awayAccent = awayTeam ? `hsl(${awayTeam.primary})` : opponentColor;
 
-  const [home = "0", away = "0"] = (score ?? "0-0").split(/[-:]/).map((s) => s.trim());
-  // Si l'équipe favorite est à l'extérieur dans le match, on inverse l'affichage du score
-  const [leftScore, rightScore] = favIsAway ? [away, home] : [home, away];
+  const [leftScore = "0", rightScore = "0"] = (score ?? "0-0").split(/[-:]/).map((s) => s.trim());
+
+  // Message contextuel pour l'équipe favorite
+  const favStatus: { label: string; tone: "highlight" | "muted" } =
+    favSide === "home"
+      ? { label: `${favTeam.name} joue à domicile`, tone: "highlight" }
+      : favSide === "away"
+      ? { label: `${favTeam.name} joue à l'extérieur`, tone: "highlight" }
+      : { label: `${favTeam.name} ne joue pas ce match`, tone: "muted" };
 
   // Live state: minuteur + stats qui évoluent en direct
   const [liveMinute, setLiveMinute] = useState(minute);
@@ -167,6 +160,22 @@ export const LiveMatchCard = ({
           </span>
         </div>
         <span className="text-[11px] text-muted-foreground truncate max-w-[50%] text-right">{venue}</span>
+      </div>
+
+      {/* Bandeau favori */}
+      <div className="relative px-5 pt-2">
+        <div
+          role="status"
+          aria-live="polite"
+          className={`flex items-center gap-2 text-[10px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-md w-fit ${
+            favStatus.tone === "highlight"
+              ? "bg-primary/15 text-primary"
+              : "bg-muted/60 text-muted-foreground"
+          }`}
+        >
+          <Info className="h-3 w-3" aria-hidden="true" />
+          {favStatus.label}
+        </div>
       </div>
 
       {/* Scoreboard */}
