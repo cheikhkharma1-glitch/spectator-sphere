@@ -1,0 +1,9 @@
+{
+  "appId": "app.lovable.42ba1c85fe9c4784887232a9db2619af",
+  "appName": "Fan 360",
+  "webDir": "dist",
+  "server": {
+    "url": "https://42ba1c85-fe9c-4784-8872-32a9db2619af.lovableproject.com?forceHideBadge=true",
+    "cleartext": true
+  }
+}
