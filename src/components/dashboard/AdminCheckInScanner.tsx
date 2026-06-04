@@ -58,7 +58,7 @@ export function AdminCheckInScanner() {
 
     const { data, error } = await supabase
       .from("tickets")
-      .select("id, reference, tribune, row_number, seat, status, user_id, checked_in_at, checked_in_by, event:events(teams, starts_at, venue), holder:profiles!tickets_user_id_fkey(first_name, last_name)")
+      .select("id, reference, tribune, row_number, seat, status, user_id, checked_in_at, checked_in_by, event:events(teams, starts_at, venue)")
       .eq("qr_code", code)
       .maybeSingle() as { data: Ticket | null; error: any };
 
@@ -71,7 +71,8 @@ export function AdminCheckInScanner() {
       return;
     }
     if (data.status === "used" || data.checked_in_at) {
-      setState({ kind: "already_used", ticket: data });
+      const holder = await supabase.from("profiles").select("first_name, last_name").eq("id", data.user_id).maybeSingle();
+      setState({ kind: "already_used", ticket: { ...data, holder: holder.data } });
       return;
     }
 
@@ -89,7 +90,8 @@ export function AdminCheckInScanner() {
     }
 
     setCount((c) => c + 1);
-    setState({ kind: "granted", ticket: { ...data, status: "used", checked_in_at: new Date().toISOString() } });
+    const holder = await supabase.from("profiles").select("first_name, last_name").eq("id", data.user_id).maybeSingle();
+    setState({ kind: "granted", ticket: { ...data, status: "used", checked_in_at: new Date().toISOString(), holder: holder.data } });
     toast.success("Entrée validée", { description: `#${data.reference}` });
   };
 
