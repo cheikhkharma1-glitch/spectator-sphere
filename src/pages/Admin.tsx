@@ -398,6 +398,8 @@ const Admin = () => {
             </div>
           </motion.section>
         )}
+
+        {tab === "checkin" && <AdminCheckInScanner />}
       </main>
 
       {/* Event create/edit dialog */}
