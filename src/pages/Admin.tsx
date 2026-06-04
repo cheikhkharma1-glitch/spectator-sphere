@@ -217,6 +217,16 @@ const Admin = () => {
           >
             <Bell className="h-4 w-4" /> Notifications
           </button>
+          <button
+            onClick={() => setTab("checkin")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+              tab === "checkin"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ScanLine className="h-4 w-4" /> Contrôle
+          </button>
         </div>
       </header>
 
