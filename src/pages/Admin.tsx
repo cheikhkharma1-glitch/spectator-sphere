@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Plus, Pencil, Trash2, Send, Calendar, Bell, Shield, AlertTriangle, Eye } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Send, Calendar, Bell, Shield, AlertTriangle, Eye, ScanLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { AdminCheckInScanner } from "@/components/dashboard/AdminCheckInScanner";
 
 type EventStatus = "upcoming" | "live" | "finished";
 type EventRow = {
@@ -42,7 +43,7 @@ const emptyEvent = {
 };
 
 const Admin = () => {
-  const [tab, setTab] = useState<"events" | "notifications">("events");
+  const [tab, setTab] = useState<"events" | "notifications" | "checkin">("events");
   const [events, setEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -216,6 +217,16 @@ const Admin = () => {
           >
             <Bell className="h-4 w-4" /> Notifications
           </button>
+          <button
+            onClick={() => setTab("checkin")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition ${
+              tab === "checkin"
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <ScanLine className="h-4 w-4" /> Contrôle
+          </button>
         </div>
       </header>
 
@@ -387,6 +398,8 @@ const Admin = () => {
             </div>
           </motion.section>
         )}
+
+        {tab === "checkin" && <AdminCheckInScanner />}
       </main>
 
       {/* Event create/edit dialog */}
