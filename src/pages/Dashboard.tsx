@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   QrCode, Calendar, Bell, MapPin, ChevronRight, Clock,
-  Trophy, Users, ArrowLeft, Zap, Volume2, LogOut, Shield
+  Trophy, Users, ArrowLeft, Zap, Volume2, LogOut, Shield, ScanLine
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { BuyTicketDialog } from "@/components/dashboard/BuyTicketDialog";
 import { StadiumGuide } from "@/components/dashboard/StadiumGuide";
 import { LiveMatchCard } from "@/components/dashboard/LiveMatchCard";
 import { FavoriteTeamPicker } from "@/components/dashboard/FavoriteTeamPicker";
+import { TicketScanner } from "@/components/dashboard/TicketScanner";
 import { useFavoriteTeam } from "@/hooks/useFavoriteTeam";
 
 type TicketRow = {
@@ -42,6 +43,7 @@ type NotificationRow = {
 const tabs = [
   { id: "schedule", label: "Programme", icon: Calendar },
   { id: "ticket", label: "Mon billet", icon: QrCode },
+  { id: "scan", label: "Scanner", icon: ScanLine },
   { id: "map", label: "Guide", icon: MapPin },
   { id: "notifications", label: "Alertes", icon: Bell },
 ];
@@ -242,6 +244,8 @@ const Dashboard = () => {
           )}
 
           {activeTab === "map" && <StadiumGuide key="map" />}
+
+          {activeTab === "scan" && <TicketScanner key="scan" />}
 
           {activeTab === "notifications" && (
             <motion.div key="notifs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
