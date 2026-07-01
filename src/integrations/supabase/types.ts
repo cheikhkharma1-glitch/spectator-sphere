@@ -115,11 +115,13 @@ export type Database = {
       }
       tickets: {
         Row: {
+          category: string
           checked_in_at: string | null
           checked_in_by: string | null
           created_at: string
           event_id: string
           id: string
+          price_fcfa: number
           qr_code: string
           reference: string
           row_number: string | null
@@ -129,11 +131,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category?: string
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
           event_id: string
           id?: string
+          price_fcfa?: number
           qr_code?: string
           reference?: string
           row_number?: string | null
@@ -143,11 +147,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category?: string
           checked_in_at?: string | null
           checked_in_by?: string | null
           created_at?: string
           event_id?: string
           id?: string
+          price_fcfa?: number
           qr_code?: string
           reference?: string
           row_number?: string | null
