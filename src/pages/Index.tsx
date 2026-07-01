@@ -77,24 +77,24 @@ const Index = () => {
             transition={{ duration: 0.8 }}
           >
             <span className="inline-block px-4 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20 mb-6">
-              Le compagnon numérique du supporter
+              Billetterie officielle des Navétanes de Dakar
             </span>
             <h1 className="font-display text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Vivez chaque
+              Achetez vos billets
               <br />
-              <span className="text-gradient">instant du match</span>
+              <span className="text-gradient">pour les Navétanes</span>
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              De l'achat de votre billet à la dernière minute de jeu, Fan 360 digitalise toute votre expérience spectateur.
+              Réservez en quelques secondes vos places pour les matchs des ASC de Dakar. Paiement Mobile Money, billet QR code instantané, et suivi live du championnat.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to={target}>
                 <Button size="lg" className="glow-primary text-base px-8">
-                  Commencer maintenant
+                  Acheter un billet
                 </Button>
               </Link>
               <Button size="lg" variant="outline" className="text-base px-8">
-                Découvrir
+                Voir le calendrier
               </Button>
             </div>
           </motion.div>
